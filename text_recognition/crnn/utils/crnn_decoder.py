@@ -1,9 +1,6 @@
 import torch.nn as nn
 from .weight_init import xavier_init
 
-# from mmocr.models.builder import DECODERS
-# from mmocr.models.textrecog.layers import BidirectionalLSTM
-# from .base_decoder import BaseDecoder
 
 class BaseDecoder(nn.Module):
     """Base decoder class for text recognition."""
@@ -20,17 +17,10 @@ class BaseDecoder(nn.Module):
     def forward_test(self, feat, out_enc, img_metas):
         raise NotImplementedError
 
-    def forward(self,
-                feat,
-                out_enc,
-                targets_dict=None,
-                img_metas=None,
-                train_mode=True):
-        self.train_mode = train_mode
-        if train_mode:
-            return self.forward_train(feat, out_enc, targets_dict, img_metas)
+    def forward(self, feat):
+        self.train_mode = False
 
-        return self.forward_test(feat, out_enc, img_metas)
+        return self.forward_test(feat)
 
 class BidirectionalLSTM(nn.Module):
 
@@ -40,10 +30,6 @@ class BidirectionalLSTM(nn.Module):
         # Original
         self.rnn = nn.LSTM(nIn, nHidden, bidirectional=True)
         self.embedding = nn.Linear(nHidden * 2, nOut)
-
-        # modified
-        # self.rnn = nn.quantized.dynamic.LSTM(nIn, nHidden, bidirectional=True)
-        # self.embedding = nn.quantized.Linear(nHidden * 2, nOut)
 
     def forward(self, input):
         recurrent, _ = self.rnn(input)
@@ -56,7 +42,6 @@ class BidirectionalLSTM(nn.Module):
         return output
 
 
-# @DECODERS.register_module()
 class CRNNDecoder(BaseDecoder):
 
     def __init__(self,
@@ -81,7 +66,7 @@ class CRNNDecoder(BaseDecoder):
             if isinstance(m, nn.Conv2d):
                 xavier_init(m)
 
-    def forward_train(self, feat, out_enc, targets_dict, img_metas):
+    def forward_train(self, feat):
         assert feat.size(2) == 1, 'feature height must be 1'
         if self.rnn_flag:
             x = feat.squeeze(2)  # [N, C, W]
@@ -95,5 +80,5 @@ class CRNNDecoder(BaseDecoder):
             outputs = x.view(n, w, c * h)
         return outputs
 
-    def forward_test(self, feat, out_enc, img_metas):
-        return self.forward_train(feat, out_enc, None, img_metas)
+    def forward_test(self, feat):
+        return self.forward_train(feat)
